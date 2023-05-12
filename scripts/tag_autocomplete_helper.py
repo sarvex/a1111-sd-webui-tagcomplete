@@ -27,8 +27,7 @@ except AttributeError:
 
 def find_ext_wildcard_paths():
     """Returns the path to the extension wildcards folder"""
-    found = list(EXT_PATH.glob('*/wildcards/'))
-    return found
+    return list(EXT_PATH.glob('*/wildcards/'))
 
 
 # The path to the extension wildcards folder
@@ -42,9 +41,11 @@ TEMP_PATH = TAGS_PATH.joinpath('temp') # Extension specific temp files
 def get_wildcards():
     """Returns a list of all wildcards. Works on nested folders."""
     wildcard_files = list(WILDCARD_PATH.rglob("*.txt"))
-    resolved = [w.relative_to(WILDCARD_PATH).as_posix(
-    ) for w in wildcard_files if w.name != "put wildcards here.txt"]
-    return resolved
+    return [
+        w.relative_to(WILDCARD_PATH).as_posix()
+        for w in wildcard_files
+        if w.name != "put wildcards here.txt"
+    ]
 
 
 def get_ext_wildcards():
@@ -64,8 +65,8 @@ def get_ext_wildcard_tags():
     wildcard_tags = {} # { tag: count }
     yaml_files = []
     for path in WILDCARD_EXT_PATHS:
-        yaml_files.extend(p for p in path.rglob("*.yml"))
-        yaml_files.extend(p for p in path.rglob("*.yaml"))
+        yaml_files.extend(iter(path.rglob("*.yml")))
+        yaml_files.extend(iter(path.rglob("*.yaml")))
     count = 0
     for path in yaml_files:
         try:
@@ -76,15 +77,12 @@ def get_ext_wildcard_tags():
                         wildcard_tags[count] = ','.join(data[item]['Tags'])
                         count += 1
                     else:
-                        print('Issue with tags found in ' + path.name + ' at item ' + item)
+                        print(f'Issue with tags found in {path.name} at item {item}')
         except yaml.YAMLError as exc:
             print(exc)
     # Sort by count
     sorted_tags = sorted(wildcard_tags.items(), key=lambda item: item[1], reverse=True)
-    output = []
-    for tag, count in sorted_tags:
-        output.append(f"{tag},{count}")
-    return output
+    return [f"{tag},{count}" for tag, count in sorted_tags]
 
 
 def get_embeddings(sd_model):
@@ -130,7 +128,10 @@ def get_embeddings(sd_model):
         #    results = [e + ",v2" for e in emb_v2] + [e + ",v1" for e in emb_v1]
         #else:
         #    raise AttributeError # Fallback to old method
-        results = sorted([e + ",v1" for e in emb_v1] + [e + ",v2" for e in emb_v2], key=lambda x: x.lower())
+        results = sorted(
+            [f"{e},v1" for e in emb_v1] + [f"{e},v2" for e in emb_v2],
+            key=lambda x: x.lower(),
+        )
     except AttributeError:
         print("tag_autocomplete_helper: Old webui version or unrecognized model shape, using fallback for embedding completion.")
         # Get a list of all embeddings in the folder
@@ -139,7 +140,7 @@ def get_embeddings(sd_model):
         all_embeds = [e for e in all_embeds if EMB_PATH.joinpath(e).stat().st_size > 0]
         # Remove file extensions
         all_embeds = [e[:e.rfind('.')] for e in all_embeds]
-        results = [e + "," for e in all_embeds]
+        results = [f"{e}," for e in all_embeds]
 
     write_to_temp_file('emb.txt', results)
 
@@ -208,18 +209,17 @@ if not TEMP_PATH.joinpath("emb.txt").exists():
 
 # Write wildcards to wc.txt if found
 if WILDCARD_PATH.exists():
-    wildcards = [WILDCARD_PATH.relative_to(FILE_DIR).as_posix()] + get_wildcards()
-    if wildcards:
+    if (
+        wildcards := [WILDCARD_PATH.relative_to(FILE_DIR).as_posix()]
+        + get_wildcards()
+    ):
         write_to_temp_file('wc.txt', wildcards)
 
 # Write extension wildcards to wce.txt if found
 if WILDCARD_EXT_PATHS is not None:
-    wildcards_ext = get_ext_wildcards()
-    if wildcards_ext:
+    if wildcards_ext := get_ext_wildcards():
         write_to_temp_file('wce.txt', wildcards_ext)
-    # Write yaml extension wildcards to wcet.txt if found
-    wildcards_yaml_ext = get_ext_wildcard_tags()
-    if wildcards_yaml_ext:
+    if wildcards_yaml_ext := get_ext_wildcard_tags():
         write_to_temp_file('wcet.txt', wildcards_yaml_ext)
 
 # Write embeddings to emb.txt if found
@@ -228,13 +228,11 @@ if EMB_PATH.exists():
     script_callbacks.on_model_loaded(get_embeddings)
 
 if HYP_PATH.exists():
-    hypernets = get_hypernetworks()
-    if hypernets:
+    if hypernets := get_hypernetworks():
         write_to_temp_file('hyp.txt', hypernets)
 
 if LORA_PATH is not None and LORA_PATH.exists():
-    lora = get_lora()
-    if lora:
+    if lora := get_lora():
         write_to_temp_file('lora.txt', lora)
 
 # Register autocomplete options
